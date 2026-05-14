@@ -80,6 +80,11 @@ function applyEvent(prev: EmailStatus, e: EmailEvent): EmailStatus {
           items: prev.followUps.items.filter((f) => f.id !== e.id),
         },
       };
+    case 'tracked.status.changed':
+    case 'tracked.stale':
+      // Tracking events are handled by useTrackedFeed, not here. Ignoring keeps
+      // the email widget from re-rendering on tracker activity.
+      return prev;
   }
 }
 

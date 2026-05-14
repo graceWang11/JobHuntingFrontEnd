@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Bookmark, Send, ListChecks, Loader2 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
@@ -21,10 +22,36 @@ export function Tracked() {
   const { tracked, loading, setStatus, remove } = useTrackedJobs();
   const [tab, setTab] = useState<Tab>('saved');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Deep-link from a toast: /tracked?expand=<jobId>. Run after `tracked` has
+  // a chance to populate so we can pick the right tab for the row's status.
+  useEffect(() => {
+    const target = searchParams.get('expand');
+    if (!target || tracked.length === 0) return;
+    const row = tracked.find((t) => t.jobId === target);
+    if (!row) return;
+    if (row.status === 'saved' || row.status === 'interested') setTab('saved');
+    else if (row.status === 'applied') setTab('applied');
+    else setTab('pipeline');
+    setExpandedId(target);
+    // Scroll after the row mounts.
+    requestAnimationFrame(() => {
+      document.getElementById(`tracked-row-${target}`)?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    });
+    // Clear the param so reload doesn't re-trigger.
+    const next = new URLSearchParams(searchParams);
+    next.delete('expand');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, tracked]);
 
   const byStatus = useMemo(() => {
     const out: Record<ApplicationStatus, typeof tracked> = {
       saved: [],
+      interested: [],
       applied: [],
       screening: [],
       interview: [],
@@ -36,14 +63,15 @@ export function Tracked() {
   }, [tracked]);
 
   const visible = useMemo(() => {
-    if (tab === 'saved') return byStatus.saved;
+    // 'saved' tab also covers 'interested' — both are pre-application tracking
+    // states (saved = explicit bookmark, interested = first-click signal).
+    if (tab === 'saved') return [...byStatus.saved, ...byStatus.interested];
     if (tab === 'applied') return byStatus.applied;
-    // Pipeline: anything past 'saved'.
     return PIPELINE_STATUSES.flatMap((s) => byStatus[s]);
   }, [tab, byStatus]);
 
   const counts = {
-    saved: byStatus.saved.length,
+    saved: byStatus.saved.length + byStatus.interested.length,
     applied: byStatus.applied.length,
     pipeline: PIPELINE_STATUSES.reduce((n, s) => n + byStatus[s].length, 0),
   };
@@ -89,16 +117,19 @@ export function Tracked() {
 
         {visible.map((t, i) => (
           <ParallaxLayer key={t.jobId} depth={4 + (i % 4) * 3}>
-            <JobRow
-              job={t.job}
-              expanded={expandedId === t.jobId}
-              status={t.status}
-              onToggle={() => setExpandedId(expandedId === t.jobId ? null : t.jobId)}
-              onSetStatus={(next) => {
-                if (next === null) remove(t.jobId);
-                else setStatus(t.jobId, next, t.job);
-              }}
-            />
+            <div id={`tracked-row-${t.jobId}`}>
+              <JobRow
+                job={t.job}
+                expanded={expandedId === t.jobId}
+                status={t.status}
+                tracked={t}
+                onToggle={() => setExpandedId(expandedId === t.jobId ? null : t.jobId)}
+                onSetStatus={(next) => {
+                  if (next === null) remove(t.jobId);
+                  else setStatus(t.jobId, next, t.job);
+                }}
+              />
+            </div>
           </ParallaxLayer>
         ))}
       </div>

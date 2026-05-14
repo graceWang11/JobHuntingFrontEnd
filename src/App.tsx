@@ -1,6 +1,8 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { UserProvider, useUser } from './context/UserContext';
 import { TrackedJobsProvider } from './context/TrackedJobsContext';
+import { ToastProvider } from './context/ToastContext';
+import { TrackedFeedListener } from './components/TrackedFeedListener';
 import { AppShell } from './components/layout/AppShell';
 import { Onboarding } from './pages/Onboarding';
 import { Login } from './pages/Login';
@@ -35,7 +37,10 @@ export default function App() {
             element={
               <RequireAuth>
                 <TrackedJobsProvider>
-                  <AppShell />
+                  <ToastProvider>
+                    <TrackedFeedListener />
+                    <AppShell />
+                  </ToastProvider>
                 </TrackedJobsProvider>
               </RequireAuth>
             }

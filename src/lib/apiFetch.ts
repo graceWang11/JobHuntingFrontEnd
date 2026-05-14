@@ -55,6 +55,8 @@ export async function apiFetch<T = unknown>(path: string, init: ApiInit = {}): P
 }
 
 // Vite env vars are strings; treat anything other than the literal "true" as off.
-export function envFlag(name: 'VITE_USE_REAL_EMAIL' | 'VITE_USE_REAL_JOBS'): boolean {
+export function envFlag(
+  name: 'VITE_USE_REAL_EMAIL' | 'VITE_USE_REAL_JOBS' | 'VITE_USE_REAL_TRACKED_JOBS',
+): boolean {
   return import.meta.env[name] === 'true';
 }

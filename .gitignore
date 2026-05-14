@@ -22,6 +22,7 @@ dist-ssr
 # Playwright MCP scratch (snapshots / consoles / screenshots from automation)
 .playwright-mcp
 post-expand.yml
+expanded-with-matches.yml
 
 # Editor directories and files
 .vscode/*

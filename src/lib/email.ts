@@ -10,6 +10,7 @@
 // Otherwise the mocks below run so the UI works offline.
 
 import { API_BASE_URL, apiFetch, envFlag } from './apiFetch';
+import type { ApplicationStatus, TrackedJob, TrackedSource } from './types';
 
 const USE_REAL = envFlag('VITE_USE_REAL_EMAIL');
 
@@ -70,7 +71,30 @@ export type EmailEvent =
       template: string;
     }
   | { type: 'followup.fired'; id: string; messageId: string }
-  | { type: 'followup.cancelled'; id: string; reason: 'user' | 'reply-received' | 'job-closed' };
+  | { type: 'followup.cancelled'; id: string; reason: 'user' | 'reply-received' | 'job-closed' }
+  // Tracking events — emitted when the classifier (or a manual action) changes
+  // a tracked-job row. Consumed by useTrackedFeed, not useEmailFeed.
+  | {
+      type: 'tracked.status.changed';
+      jobId: string;
+      previousStatus: ApplicationStatus;
+      status: ApplicationStatus;
+      source: TrackedSource;
+      evidenceThreadId?: string;
+      interviewAt?: string;
+      /** Full row, when the backend ships it inline. Optional — consumers should
+       *  tolerate its absence and either re-fetch or patch from the other fields. */
+      row?: TrackedJob;
+      /** For the auto-detect toast: human-readable sender of the email that
+       *  triggered the change. */
+      evidenceSender?: string;
+    }
+  | {
+      type: 'tracked.stale';
+      jobId: string;
+      daysSinceApplied: number;
+      row?: TrackedJob;
+    };
 
 const nowIso = () => new Date().toISOString();
 const addMin = (m: number) => new Date(Date.now() + m * 60_000).toISOString();
@@ -172,6 +196,8 @@ export function subscribeEmailFeed(onEvent: (e: EmailEvent) => void): () => void
     src.addEventListener('followup.scheduled', wrap('followup.scheduled'));
     src.addEventListener('followup.fired', wrap('followup.fired'));
     src.addEventListener('followup.cancelled', wrap('followup.cancelled'));
+    src.addEventListener('tracked.status.changed', wrap('tracked.status.changed'));
+    src.addEventListener('tracked.stale', wrap('tracked.stale'));
     return () => src.close();
   }
   let i = 0;

@@ -20,6 +20,7 @@ import {
   ExternalLink,
   Copy,
   Check,
+  TrendingUp,
 } from 'lucide-react';
 
 function LinkedInIcon({ size = 16 }: { size?: number }) {
@@ -41,7 +42,7 @@ import { useUser } from '../context/UserContext';
 import { useTrackedJobs } from '../context/TrackedJobsContext';
 import { fetchMatchedJobs } from '../lib/jobs';
 import { POPULAR_LOCATIONS } from '../data/locations';
-import type { ApplicationStatus, Job, JobType } from '../lib/types';
+import type { ApplicationStatus, Job, JobType, TrackedJob } from '../lib/types';
 import { cn } from '../lib/cn';
 
 type Sort = 'match' | 'newest' | 'salary';
@@ -380,8 +381,16 @@ export function Jobs() {
               <JobRow
                 job={j}
                 expanded={selectedId === j.id}
+                tracked={t ?? null}
                 status={t?.status ?? null}
-                onToggle={() => setSelectedId(selectedId === j.id ? null : j.id)}
+                onToggle={() => {
+                  const willExpand = selectedId !== j.id;
+                  setSelectedId(willExpand ? j.id : null);
+                  // First-time click on a row tracks it as "interested" — the
+                  // backend classifier upgrades to "applied" once the
+                  // confirmation email lands. Manual Save/Apply still win.
+                  if (willExpand && !t) setTrackedStatus(j.id, 'interested', j);
+                }}
                 onSetStatus={(next) => handleSetStatus(j, next)}
               />
             </ParallaxLayer>
@@ -394,6 +403,7 @@ export function Jobs() {
 
 const STAGE_OPTIONS: { value: ApplicationStatus | ''; label: string }[] = [
   { value: '', label: 'Not tracked' },
+  { value: 'interested', label: 'Interested' },
   { value: 'saved', label: 'Saved' },
   { value: 'applied', label: 'Applied' },
   { value: 'screening', label: 'Screening' },
@@ -404,6 +414,7 @@ const STAGE_OPTIONS: { value: ApplicationStatus | ''; label: string }[] = [
 
 const STAGE_TONE: Record<ApplicationStatus, string> = {
   saved: 'text-accent-sky',
+  interested: 'text-accent-sky',
   applied: 'text-grad',
   screening: 'text-accent-pink',
   interview: 'text-accent-peach',
@@ -411,16 +422,52 @@ const STAGE_TONE: Record<ApplicationStatus, string> = {
   rejected: 'text-accent-rose',
 };
 
+const SALARY_TONE: Record<NonNullable<Job['salaryComparison']>['kind'], string> = {
+  below: '!text-accent-rose',
+  within: '!text-accent-mint',
+  above: '!text-accent-violet',
+  overlap: '!text-accent-sky',
+};
+
+const POSTING_AGE_TONE: Record<NonNullable<Job['postingAge']>['kind'], string> = {
+  fresh: '!text-accent-mint',
+  normal: '',
+  stale: '!text-accent-rose',
+};
+
+const EMPLOYMENT_LABEL: Record<NonNullable<Job['employmentType']>, string> = {
+  permanent: 'Permanent',
+  contract: 'Contract',
+  casual: 'Casual',
+  internship: 'Internship',
+  temp: 'Temporary',
+};
+
+const INTERVIEW_FORMATTER = new Intl.DateTimeFormat(undefined, {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+});
+
+function formatEmploymentLabel(j: Job): string {
+  if (!j.employmentType) return '';
+  if (j.employmentType === 'contract' && j.contractMonths) {
+    return `${j.contractMonths}-month contract`;
+  }
+  return EMPLOYMENT_LABEL[j.employmentType];
+}
+
 export function JobRow({
   job,
   expanded,
   status,
+  tracked,
   onToggle,
   onSetStatus,
 }: {
   job: Job;
   expanded: boolean;
   status: ApplicationStatus | null;
+  tracked?: TrackedJob | null;
   onToggle: () => void;
   onSetStatus: (next: ApplicationStatus | null) => void;
 }) {
@@ -482,17 +529,52 @@ export function JobRow({
             <Chip leftIcon={JOB_TYPE_META[job.type].icon} className="!text-[10px]">
               {JOB_TYPE_META[job.type].label}
             </Chip>
-            <Chip leftIcon={<DollarSign size={11} />} className="!text-[10px]">
-              ${(job.salaryMin / 1000).toFixed(0)}k–${(job.salaryMax / 1000).toFixed(0)}k
-            </Chip>
+            {job.employmentType && (
+              <span
+                title={job.contractDetail || undefined}
+                className={job.contractDetail ? 'cursor-help' : undefined}
+              >
+                <Chip className="!text-[10px]">
+                  🗓️ {formatEmploymentLabel(job)}
+                </Chip>
+              </span>
+            )}
+            {(job.salaryMin > 0 || job.salaryMax > 0) && (
+              <Chip leftIcon={<DollarSign size={11} />} className="!text-[10px]">
+                JD: ${(job.salaryMin / 1000).toFixed(0)}k–${(job.salaryMax / 1000).toFixed(0)}k
+              </Chip>
+            )}
+            {(job.marketSalaryMin ?? 0) > 0 && (job.marketSalaryMax ?? 0) > 0 && (
+              <Chip leftIcon={<TrendingUp size={11} />} className="!text-[10px]">
+                Market: ${((job.marketSalaryMin ?? 0) / 1000).toFixed(0)}k–${((job.marketSalaryMax ?? 0) / 1000).toFixed(0)}k
+              </Chip>
+            )}
+            {job.salaryComparison && (
+              <Chip
+                className={cn(
+                  '!text-[10px] !font-bold',
+                  SALARY_TONE[job.salaryComparison.kind],
+                )}
+              >
+                {job.salaryComparison.summary}
+              </Chip>
+            )}
             {job.visaSponsorship && (
               <Chip leftIcon={<ShieldCheck size={11} />} className="!text-[10px]">
                 Sponsors visa
               </Chip>
             )}
-            <Chip leftIcon={<CalendarClock size={11} />} className="!text-[10px]">
+            <Chip
+              leftIcon={<CalendarClock size={11} />}
+              className={cn('!text-[10px]', job.postingAge && POSTING_AGE_TONE[job.postingAge.kind])}
+            >
               {timeAgo(job.postedAt)}
             </Chip>
+            {tracked?.isStale && (
+              <Chip className="!text-[10px] !font-bold !text-accent-rose">
+                🕒 Over 30 days
+              </Chip>
+            )}
           </div>
 
           <div className="flex items-center gap-2 mt-4">
@@ -524,6 +606,24 @@ export function JobRow({
             >
               {saved ? 'Saved' : 'Save'}
             </Button>
+
+            {tracked?.interviewAt && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!expanded) onToggle();
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold neu-sm text-accent-peach hover:bg-white/55 transition"
+                title={
+                  tracked.interviewLocation
+                    ? `Interview · ${tracked.interviewLocation}`
+                    : 'Interview scheduled'
+                }
+              >
+                📅 Interview · {INTERVIEW_FORMATTER.format(new Date(tracked.interviewAt))}
+              </button>
+            )}
 
             <div
               className="relative ml-2"
@@ -580,8 +680,20 @@ export function JobRow({
 }
 
 function JobDetail({ job }: { job: Job }) {
+  const { preferences } = useUser();
   const [message, setMessage] = useState(job.outreachMessage ?? '');
   const [copied, setCopied] = useState(false);
+
+  // Resume↔JD skill match: highlight any tech skill the candidate already has.
+  // Normalisation is intentionally light — lowercasing + whitespace squashing.
+  // Heavier rules (stripping punctuation, stemming) caused too many false
+  // positives like 'C' matching 'C#'.
+  const resumeSkillSet = useMemo(() => {
+    const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+    return new Set((preferences.keywords ?? []).map(norm));
+  }, [preferences.keywords]);
+  const isMatched = (skill: string) =>
+    resumeSkillSet.has(skill.toLowerCase().trim().replace(/\s+/g, ' '));
 
   // Reset the textarea when the expanded job changes.
   useEffect(() => {
@@ -624,19 +736,70 @@ function JobDetail({ job }: { job: Job }) {
         <div className="text-xs font-semibold uppercase tracking-wider text-ink-mute mb-2">
           About the role
         </div>
-        <p className="text-sm text-ink-soft leading-relaxed">{job.description}</p>
+        {job.descriptionSections && job.descriptionSections.length > 0 ? (
+          <div className="space-y-4">
+            {job.descriptionSections.map((section, i) => (
+              <div key={i}>
+                {section.heading && (
+                  <div className="text-sm font-semibold text-ink mb-1.5">
+                    {section.heading}
+                  </div>
+                )}
+                {section.bullets.length > 0 && (
+                  <ul className="text-sm text-ink-soft leading-relaxed space-y-1 list-disc pl-5">
+                    {section.bullets.map((b, j) => (
+                      <li key={j}>{b}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-ink-soft leading-relaxed whitespace-pre-wrap">
+            {job.description}
+          </p>
+        )}
       </div>
 
-      <div className="mt-4">
-        <div className="text-xs font-semibold uppercase tracking-wider text-ink-mute mb-2">
-          Tech & skills
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {job.tags.map((t) => (
-            <Chip key={t}>{t}</Chip>
-          ))}
-        </div>
-      </div>
+      {((job.techSkills && job.techSkills.length > 0) || job.tags.length > 0) && (() => {
+        const skills = job.techSkills && job.techSkills.length > 0 ? job.techSkills : job.tags;
+        const matchedCount = skills.filter(isMatched).length;
+        return (
+          <div className="mt-4">
+            <div className="text-xs font-semibold uppercase tracking-wider text-ink-mute mb-2 flex items-center gap-2 flex-wrap">
+              <span>Tech &amp; skills</span>
+              {job.techSkills && job.techSkills.length > 0 && (
+                <span className="normal-case tracking-normal text-ink-mute/70 font-normal">
+                  · extracted from JD
+                </span>
+              )}
+              {matchedCount > 0 && (
+                <span className="normal-case tracking-normal font-bold text-emerald-600 inline-flex items-center gap-1">
+                  <Check size={12} /> {matchedCount} from your resume
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {skills.map((t) => {
+                const matched = isMatched(t);
+                return (
+                  <Chip
+                    key={t}
+                    leftIcon={matched ? <Check size={11} /> : undefined}
+                    className={cn(
+                      matched &&
+                        '!bg-emerald-50 !text-emerald-700 !ring-1 !ring-emerald-200 !font-bold',
+                    )}
+                  >
+                    {t}
+                  </Chip>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {job.visaSponsorship && (
         <div className="mt-4 glass rounded-2xl p-3 flex items-center gap-2 text-sm text-ink-soft">
