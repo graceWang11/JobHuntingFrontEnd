@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  @apply bg-base text-ink font-sans antialiased;
+  background-color: #e8ecf4;
+  background-image:
+    radial-gradient(at 12% 14%, rgba(124, 92, 255, 0.18) 0px, transparent 45%),
+    radial-gradient(at 88% 8%, rgba(255, 110, 199, 0.16) 0px, transparent 45%),
+    radial-gradient(at 82% 92%, rgba(92, 200, 255, 0.18) 0px, transparent 45%),
+    radial-gradient(at 8% 86%, rgba(255, 184, 108, 0.14) 0px, transparent 45%);
+  background-attachment: fixed;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+@layer components {
+  /* ---------- Glassmorphism ---------- */
+  .glass {
+    @apply bg-white/40 backdrop-blur-xl border border-white/50 shadow-glass;
+  }
+  .glass-strong {
+    @apply bg-white/55 backdrop-blur-2xl border border-white/60 shadow-glass-lg;
+  }
+  .glass-dark {
+    @apply bg-ink/30 backdrop-blur-xl border border-white/15 text-white shadow-glass;
+  }
+  .glass-chip {
+    @apply bg-white/50 backdrop-blur-md border border-white/60;
+    box-shadow: 0 4px 14px rgba(31, 38, 135, 0.12);
+  }
+
+  /* ---------- Neumorphism ---------- */
+  .neu {
+    background: #e8ecf4;
+    @apply shadow-neu;
+  }
+  .neu-sm {
+    background: #e8ecf4;
+    @apply shadow-neu-sm;
+  }
+  .neu-lg {
+    background: #e8ecf4;
+    @apply shadow-neu-lg;
+  }
+  .neu-inset {
+    background: #e8ecf4;
+    @apply shadow-neu-inset;
+  }
+  .neu-inset-sm {
+    background: #e8ecf4;
+    @apply shadow-neu-inset-sm;
+  }
+
+  /* ---------- Buttons ---------- */
+  .btn-neu {
+    @apply neu rounded-2xl px-5 py-3 font-semibold text-ink transition active:shadow-neu-inset hover:-translate-y-[1px];
+  }
+  .btn-glass {
+    @apply glass rounded-2xl px-5 py-3 font-semibold text-ink hover:bg-white/60 transition;
+  }
+  .btn-primary {
+    @apply rounded-2xl px-5 py-3 font-semibold text-white bg-accent-grad hover:brightness-110 active:brightness-95 transition;
+    box-shadow: 0 10px 30px rgba(124, 92, 255, 0.45);
+  }
+
+  /* ---------- Inputs ---------- */
+  .input-neu {
+    background: #e8ecf4;
+    @apply shadow-neu-inset rounded-2xl px-4 py-3 w-full text-ink placeholder:text-ink-mute
+           focus:outline-none focus:ring-2 focus:ring-accent-violet/50 transition;
+  }
+
+  /* ---------- Chips / Pills ---------- */
+  .chip {
+    @apply glass-chip rounded-full px-3 py-1 text-xs font-semibold text-ink-soft;
+  }
+  .chip-active {
+    @apply rounded-full px-3 py-1 text-xs font-semibold text-white bg-accent-grad;
+    box-shadow: 0 6px 18px rgba(124, 92, 255, 0.4);
+  }
+
+  /* ---------- Text ---------- */
+  .text-grad {
+    @apply bg-clip-text text-transparent bg-accent-grad;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hidden {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-tap-highlight {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Aurora background blobs for hero/login/onboarding pages */
+.aurora-bg {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.aurora-bg::before,
+.aurora-bg::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background-image: radial-gradient(circle at 25% 30%, rgba(124, 92, 255, 0.55), transparent 45%),
+    radial-gradient(circle at 75% 25%, rgba(255, 110, 199, 0.45), transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(92, 200, 255, 0.5), transparent 45%),
+    radial-gradient(circle at 25% 75%, rgba(255, 184, 108, 0.4), transparent 45%);
+  filter: blur(60px);
+  z-index: -1;
+  animation: float 14s ease-in-out infinite;
+}
+.aurora-bg::after {
+  animation-duration: 22s;
+  opacity: 0.6;
+}

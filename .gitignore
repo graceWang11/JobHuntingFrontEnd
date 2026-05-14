@@ -1,0 +1,35 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Env files (keep .env.example tracked, ignore the real one)
+.env
+
+# Vite cache & TS build info
+.vite
+*.tsbuildinfo
+
+# Playwright MCP scratch (snapshots / consoles / screenshots from automation)
+.playwright-mcp
+post-expand.yml
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

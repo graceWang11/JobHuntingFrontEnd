@@ -1,0 +1,30 @@
+export const POPULAR_LOCATIONS = [
+  'Remote',
+  'San Francisco, CA',
+  'New York, NY',
+  'Los Angeles, CA',
+  'Seattle, WA',
+  'Austin, TX',
+  'Boston, MA',
+  'Chicago, IL',
+  'Toronto, Canada',
+  'Vancouver, Canada',
+  'London, UK',
+  'Berlin, Germany',
+  'Amsterdam, NL',
+  'Sydney, Australia',
+  'Singapore',
+];
+
+export const POPULAR_ROLES = [
+  'Frontend Engineer',
+  'Backend Engineer',
+  'Full Stack Engineer',
+  'Mobile Engineer',
+  'Product Designer',
+  'Design Engineer',
+  'Engineering Manager',
+  'DevOps Engineer',
+  'AI / ML Engineer',
+  'Data Engineer',
+];
