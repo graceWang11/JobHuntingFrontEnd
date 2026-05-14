@@ -681,8 +681,22 @@ export function JobRow({
 
 function JobDetail({ job }: { job: Job }) {
   const { preferences } = useUser();
+  const { byId, patch } = useTrackedJobs();
+  const tracked = byId.get(job.id) ?? null;
+
   const [message, setMessage] = useState(job.outreachMessage ?? '');
   const [copied, setCopied] = useState(false);
+
+  // Interview editor: datetime-local input is in the user's local tz, so we
+  // convert to/from UTC ISO Z explicitly. No external date library.
+  const [interviewAtLocal, setInterviewAtLocal] = useState<string>(
+    toLocalDateTimeInput(tracked?.interviewAt ?? null),
+  );
+  const [interviewLocation, setInterviewLocation] = useState<string>(
+    tracked?.interviewLocation ?? '',
+  );
+  const [savingInterview, setSavingInterview] = useState(false);
+  const [savedInterview, setSavedInterview] = useState(false);
 
   // Resume↔JD skill match: highlight any tech skill the candidate already has.
   // Normalisation is intentionally light — lowercasing + whitespace squashing.
@@ -695,11 +709,14 @@ function JobDetail({ job }: { job: Job }) {
   const isMatched = (skill: string) =>
     resumeSkillSet.has(skill.toLowerCase().trim().replace(/\s+/g, ' '));
 
-  // Reset the textarea when the expanded job changes.
+  // Reset editors when the expanded job changes or the tracked row arrives.
   useEffect(() => {
     setMessage(job.outreachMessage ?? '');
     setCopied(false);
-  }, [job.id, job.outreachMessage]);
+    setInterviewAtLocal(toLocalDateTimeInput(tracked?.interviewAt ?? null));
+    setInterviewLocation(tracked?.interviewLocation ?? '');
+    setSavedInterview(false);
+  }, [job.id, job.outreachMessage, tracked?.interviewAt, tracked?.interviewLocation]);
 
   const handleCopy = async () => {
     try {
@@ -708,6 +725,35 @@ function JobDetail({ job }: { job: Job }) {
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
       // navigator.clipboard requires HTTPS or localhost; ignore silently here.
+    }
+  };
+
+  const interviewDirty =
+    interviewAtLocal !== toLocalDateTimeInput(tracked?.interviewAt ?? null) ||
+    interviewLocation !== (tracked?.interviewLocation ?? '');
+
+  const handleSaveInterview = async () => {
+    if (!tracked) return;
+    setSavingInterview(true);
+    try {
+      await patch(job.id, {
+        interviewAt: interviewAtLocal ? fromLocalDateTimeInput(interviewAtLocal) : null,
+        interviewLocation: interviewLocation.trim() ? interviewLocation.trim() : null,
+      });
+      setSavedInterview(true);
+      window.setTimeout(() => setSavedInterview(false), 1500);
+    } finally {
+      setSavingInterview(false);
+    }
+  };
+
+  const handleClearInterview = async () => {
+    if (!tracked) return;
+    setSavingInterview(true);
+    try {
+      await patch(job.id, { interviewAt: null, interviewLocation: null });
+    } finally {
+      setSavingInterview(false);
     }
   };
 
@@ -869,6 +915,61 @@ function JobDetail({ job }: { job: Job }) {
         </div>
       )}
 
+      {tracked && (
+        <div className="mt-5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-semibold uppercase tracking-wider text-ink-mute">
+              Interview details
+            </div>
+            {savedInterview && (
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600">
+                <Check size={12} /> Saved
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="datetime-local"
+              value={interviewAtLocal}
+              onChange={(e) => setInterviewAtLocal(e.target.value)}
+              className="neu-inset rounded-xl px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent-violet/40"
+              aria-label="Interview date and time"
+            />
+            <input
+              type="text"
+              value={interviewLocation}
+              onChange={(e) => setInterviewLocation(e.target.value)}
+              placeholder="Location (e.g. Zoom, Lumen Labs HQ)"
+              className="neu-inset rounded-xl px-3 py-2 text-sm text-ink flex-1 focus:outline-none focus:ring-2 focus:ring-accent-violet/40"
+              aria-label="Interview location"
+            />
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={handleSaveInterview}
+              disabled={savingInterview || !interviewDirty}
+            >
+              {savingInterview ? 'Saving…' : 'Save'}
+            </Button>
+            {tracked.interviewAt && (
+              <Button
+                size="sm"
+                variant="neu"
+                onClick={handleClearInterview}
+                disabled={savingInterview}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+          <p className="text-[10px] text-ink-mute mt-1.5">
+            Times use your local timezone; sent to the server as UTC. Setting these
+            here is the manual override path — the email classifier auto-fills them
+            when it sees a confirmed invite.
+          </p>
+        </div>
+      )}
+
       {(job.outreachMessage || hasContacts) && (
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2">
@@ -907,6 +1008,24 @@ function Mini({ label, value }: { label: string; value: string }) {
       <div className="text-sm font-semibold text-ink mt-1 truncate">{value}</div>
     </div>
   );
+}
+
+function toLocalDateTimeInput(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`;
+}
+
+function fromLocalDateTimeInput(value: string): string | null {
+  if (!value) return null;
+  // The datetime-local input has no timezone; the browser parses it as local
+  // time. toISOString() converts to UTC with a Z suffix.
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 function formatRefreshed(d: Date): string {
